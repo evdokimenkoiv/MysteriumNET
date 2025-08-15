@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MysteriumNET</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header>
+  <h1>MysteriumNET</h1>
+  <div class="sub">Dashboard • Nodes • Wallets • ACL</div>
+</header>
+
+<section class="grid-3">
+  <div class="card kpi">
+    <div class="kpi-num">{{ total }}</div>
+    <div class="kpi-label">Total nodes</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-num">{{ up }}</div>
+    <div class="kpi-label">Myst running</div>
+  </div>
+  <div class="card kpi">
+    <form method="post" action="/nodes/collect_all"><button>Collect All</button></form>
+    <div class="muted">Запрашивает статусы с каждой ноды</div>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <h2>Add node</h2>
+    <form method="post" action="/nodes/add">
+      <div class="grid-2">
+        <label>Host/IP <input type="text" name="host" required></label>
+        <label>User <input type="text" name="user" value="ubuntu" required></label>
+      </div>
+      <div class="grid-3">
+        <label>SSH port <input type="number" name="port" value="22"></label>
+        <label>Auth
+          <select name="auth_type" id="auth_type" onchange="toggleAuth()">
+            <option value="password" selected>Password</option>
+            <option value="key">SSH key</option>
+          </select>
+        </label>
+        <label id="pass_lbl">Password <input type="password" name="password"></label>
+        <label id="key_lbl" style="display:none;">Key path <input type="text" name="key_path" placeholder="/root/.ssh/id_rsa"></label>
+        <label>WG UDP port <input type="number" name="wg_port" value="51820"></label>
+      </div>
+      <div class="grid-3">
+        <label>Payout wallet
+          <select name="wallet_id">
+            <option value="0">-- none / custom --</option>
+            {% for w in wallets %}
+              <option value="{{w.id}}">{{w.label}} — {{w.address[:10]}}…</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Custom payout (0x…) <input type="text" name="payout_address" placeholder="0x..."></label>
+        <label>Notes <input type="text" name="notes" placeholder="RU / pool A / city"></label>
+      </div>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Wallet vault</h2>
+    <form method="post" action="/wallets/add" class="grid-3">
+      <label>Label <input type="text" name="label" placeholder="main / reserve" required></label>
+      <label>Address <input type="text" name="address" placeholder="0x..." required></label>
+      <div><button type="submit">Add wallet</button></div>
+    </form>
+
+    <table id="tbl-wallets">
+      <thead>
+        <tr>
+          <th onclick="sortTable('tbl-wallets',0)">Label</th>
+          <th onclick="sortTable('tbl-wallets',1)">Address</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for w in wallets %}
+        <tr>
+          <td>{{w.label}}</td>
+          <td class="mono">{{w.address}}</td>
+          <td>
+            <form method="post" action="/wallets/{{w.id}}/delete" onsubmit="return confirm('Delete wallet?');">
+              <button>Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="card">
+  <h2>Nodes</h2>
+  <table id="tbl-nodes">
+    <thead>
+      <tr>
+        <th onclick="sortTable('tbl-nodes',0)">ID</th>
+        <th onclick="sortTable('tbl-nodes',1)">Host</th>
+        <th onclick="sortTable('tbl-nodes',2)">User</th>
+        <th onclick="sortTable('tbl-nodes',3)">SSH</th>
+        <th onclick="sortTable('tbl-nodes',4)">WG</th>
+        <th onclick="sortTable('tbl-nodes',5)">Wallet</th>
+        <th onclick="sortTable('tbl-nodes',6)">Last seen</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for n in nodes %}
+      <tr>
+        <td>{{n.id}}</td>
+        <td>{{n.host}}</td>
+        <td>{{n.user}}</td>
+        <td>{{n.port}}</td>
+        <td>{{n.wg_port}}</td>
+        <td class="mono">{{n.wallet_label or n.payout_address or ''}}</td>
+        <td>{{n.last_seen or ''}}</td>
+        <td class="actions">
+          <form method="post" action="/nodes/{{n.id}}/deploy"><button>Deploy</button></form>
+          <form method="post" action="/nodes/{{n.id}}/collect"><button>Collect</button></form>
+          <form method="post" action="/nodes/{{n.id}}/delete" onsubmit="return confirm('Delete node from list?');"><button>Delete</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Management ACL (this server)</h2>
+  <p>Разреши доступ к <b>SSH (22/tcp)</b> и к панели (<b>{{ (env.get('UVICORN_PORT') if env else 8080) }}</b>/tcp) только с нужных IP/CIDR.</p>
+  <form method="post" action="/acl/add" class="grid-3">
+    <label>Port <input type="number" name="port" placeholder="22/8080/80/443" required></label>
+    <label>CIDR/IP <input type="text" name="cidr" placeholder="x.x.x.x[/mask]" required></label>
+    <div><button type="submit">Add rule</button></div>
+  </form>
+  <form method="post" action="/acl/apply">
+    <table id="tbl-acl">
+      <thead>
+      <tr>
+        <th onclick="sortTable('tbl-acl',0)">Port</th>
+        <th onclick="sortTable('tbl-acl',1)">Proto</th>
+        <th onclick="sortTable('tbl-acl',2)">CIDR</th>
+        <th onclick="sortTable('tbl-acl',3)">Enabled</th>
+        <th>Actions</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for a in acls %}
+        <tr>
+          <td>{{a.port}}</td>
+          <td>{{a.proto}}</td>
+          <td class="mono">{{a.cidr}}</td>
+          <td>{{'yes' if a.enabled else 'no'}}</td>
+          <td class="actions">
+            <form method="post" action="/acl/{{a.id}}/toggle"><button type="submit">Toggle</button></form>
+            <form method="post" action="/acl/{{a.id}}/delete"><button type="submit">Delete</button></form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button type="submit">Apply to UFW</button>
+    <div class="muted">Безопасность: при применении автоматически добавляется текущий IP для 22 и порта панели.</div>
+  </form>
+</div>
+
+<script>
+function toggleAuth() {
+  const v = document.getElementById('auth_type').value;
+  document.getElementById('pass_lbl').style.display = v === 'password' ? 'block' : 'none';
+  document.getElementById('key_lbl').style.display = v === 'key' ? 'block' : 'none';
+}
+function sortTable(tableId, colIndex) {
+  const table = document.getElementById(tableId);
+  const tbody = table.tBodies[0];
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const isNumeric = (v) => /^-?\d+(\.\d+)?$/.test(v);
+  const get = (tr) => (tr.children[colIndex].innerText || "").trim();
+  const asc = table.getAttribute("data-sort-dir") !== "asc";
+  rows.sort((a,b) => {
+    const av = get(a), bv = get(b);
+    if (isNumeric(av) && isNumeric(bv)) return (parseFloat(av)-parseFloat(bv)) * (asc?1:-1);
+    return av.localeCompare(bv) * (asc?1:-1);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
+}
+</script>
+</body>
+</html>
