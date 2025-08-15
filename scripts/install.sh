@@ -56,4 +56,5 @@ EOF
 systemctl daemon-reload
 systemctl enable --now myst-manager
 ufw allow ${UVICORN_PORT}/tcp || true
+
 echo "Done. Panel: http://<server_ip>:${UVICORN_PORT} (user: ${ADMIN_USER})"
