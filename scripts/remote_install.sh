@@ -6,6 +6,7 @@ export DEBIAN_FRONTEND=noninteractive
 MGMT_IP="${MGMT_IP:-}"
 PAYOUT_ADDRESS="${PAYOUT_ADDRESS:-}"
 WG_PORT="${WG_PORT:-51820}"
+API_PORT="${API_PORT:-4050}"
 apt-get update -y
 apt-get install -y ca-certificates curl gnupg jq ufw vnstat
 install -m 0755 -d /etc/apt/keyrings
@@ -16,14 +17,6 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 apt-get update -y
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable --now docker
-cat >/etc/sysctl.d/99-myst-tuning.conf <<'EOF'
-net.core.somaxconn = 4096
-net.ipv4.tcp_fin_timeout = 15
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.ip_local_port_range = 10000 65000
-net.ipv4.conf.all.rp_filter = 2
-EOF
-sysctl --system
 if ! ufw status | grep -q "Status: active"; then
   ufw default deny incoming
   ufw default allow outgoing
@@ -33,15 +26,10 @@ if ! ufw status | grep -q "Status: active"; then
 else
   ufw allow ${WG_PORT}/udp || true
 fi
-if [[ -n "${MGMT_IP}" ]]; then
-  ufw delete allow OpenSSH || true
-  ufw allow from ${MGMT_IP} to any port 22 proto tcp
-  ufw reload
-fi
 mkdir -p /opt/myst/{data,logs}
 cat >/opt/myst/myst.env <<EOF
 LOG_LEVEL=info
-MYST_TEQUILA_API_PORT=4050
+MYST_TEQUILA_API_PORT=${API_PORT}
 WIREGUARD_PORT=${WG_PORT}
 PAYOUT_ADDRESS=${PAYOUT_ADDRESS}
 EOF

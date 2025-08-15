@@ -6,3 +6,5 @@ pydantic==2.8.2
 pydantic-settings==2.4.0
 sqlite-utils==3.36
 python-dotenv==1.0.1
+python-multipart==0.0.9
+prometheus-client==0.20.0
